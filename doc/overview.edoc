@@ -1,4 +1,10 @@
+@title Elementary - A modern S3 client for Erlang
+
 @doc
-A modern S3 client for Erlang.
+[![Release](http://img.shields.io/github/release/eproxus/elementary.svg)](https://github.com/eproxus/elementary/releases/latest)
+[![Build Status](http://img.shields.io/travis/eproxus/elementary.svg)](http://travis-ci.org/eproxus/elementary)
+[![Code Climate](http://img.shields.io/badge/code_climate-17.0-brightgreen.svg)](https://travis-ci.org/eproxus/elementary)
+
+TODO
 @end
 
