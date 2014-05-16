@@ -1,0 +1,9 @@
+ebin
+.eunit
+deps
+*.o
+*.beam
+*.plt
+erl_crash.dump
+doc/edoc-info
+doc/utf8

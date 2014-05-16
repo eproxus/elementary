@@ -1,0 +1,6 @@
+{application, elementary, [
+  {description, "A modern S3 client"},
+  {vsn, "0.1"},
+  {applications, [kernel, stdlib, hackney, erlsha2]},
+  {mod, {elementary, []}}
+]}.
