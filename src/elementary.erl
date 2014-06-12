@@ -72,13 +72,13 @@ get(Bucket, Key) ->
         <<"eu-west-1">>,
         <<"s3">>
     ),
-    {ok, _StatusCode, _RespHeaders, _ClientRef} = hackney:request(
-        get,
-        URL,
-        Headers ++ AuthHeaders,
-        Payload,
-        Options
-    ).
+    case hackney:get(URL, Headers ++ AuthHeaders, Payload, Options) of
+        {ok, 404, _RespHeaders, _ClientRef} ->
+            not_found;
+        {ok, 200, _RespHeaders, ClientRef} ->
+            {ok, Body} = hackney:body(ClientRef),
+            Body
+    end.
 
 close(Bucket) ->
     Config = get_bucket(Bucket),
