@@ -3,6 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 % AWS Documentation Examples
+% http://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
 
 -define(EXAMPLE_CANONICAL_REQUEST,
 <<"GET
