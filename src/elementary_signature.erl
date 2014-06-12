@@ -75,7 +75,7 @@ signature(SecretAccessKey, Date, Region, Service, StringToSign) ->
     DateRegionKey = hmac:hmac256(DateKey, Region),
     DateRegionServiceKey = hmac:hmac256(DateRegionKey, Service),
     SigningKey = hmac:hmac256(DateRegionServiceKey, "aws4_request"),
-    string:to_lower(hmac:hexlify(hmac:hmac256(SigningKey, StringToSign))).
+    hmac:hexlify(hmac:hmac256(SigningKey, StringToSign), [lower]).
 
 %--- Parts --------------------------------------------------------------------
 
@@ -100,10 +100,13 @@ scope(Date, Region, Service) ->
 %--- Utility Functions --------------------------------------------------------
 
 timestamp(Date, {Hour, Minute, Second}) ->
-    io_lib:format("~sT~2..0w~2..0w~2..0wZ", [Date, Hour, Minute, Second]).
+    [Date, "T", pad(Hour), pad(Minute), pad(Second), "Z"].
 
 date({Year, Month, Day}) ->
-    io_lib:format("~4..0w~2..0w~2..0w", [Year, Month, Day]).
+    [integer_to_list(Year), pad(Month), pad(Day)].
+
+pad(Number) when Number < 10 -> ["0", integer_to_list(Number)];
+pad(Number)                  -> integer_to_list(Number).
 
 lowercase(Binary) when is_binary(Binary) -> lowercase(binary_to_list(Binary));
 lowercase(String) when is_list(String)   -> string:to_lower(String).
@@ -114,7 +117,7 @@ trim(IOData) ->
 hash(<<>>) ->
     <<"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855">>;
 hash(Payload) ->
-    string:to_lower(hmac:hexlify(erlsha2:sha256(Payload))).
+    hmac:hexlify(erlsha2:sha256(Payload), [lower]).
 
 iolist_join([], _Separator)          -> [];
 iolist_join([First|List], Separator) -> [First, [[Separator, I] || I <- List]].
