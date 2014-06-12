@@ -21,7 +21,8 @@
 %--- Application Callbacks ----------------------------------------------------
 
 start(_StartType, _StartArgs) ->
-    ets:new(?MODULE, [named_table, public]).
+    ets:new(?MODULE, [named_table, public]),
+    {ok, self()}.
 
 stop(_State) ->
     ets:delete(?MODULE).
