@@ -3,12 +3,12 @@
 % API
 -export([headers/8]).
 
-% -ifdef(TEST).
+-ifdef(TEST).
 -export([headers/9]).
 -export([canonical_request/4]).
 -export([string_to_sign/3]).
 -export([signature/5]).
-% -endif.
+-endif.
 
 %--- API ----------------------------------------------------------------------
 
