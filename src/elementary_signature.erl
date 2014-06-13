@@ -3,12 +3,12 @@
 % API
 -export([headers/8]).
 
--ifdef(TEST).
+% -ifdef(TEST).
 -export([headers/9]).
 -export([canonical_request/4]).
 -export([string_to_sign/3]).
 -export([signature/5]).
--endif.
+% -endif.
 
 %--- API ----------------------------------------------------------------------
 
@@ -22,10 +22,9 @@ headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
 
 headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
         Region, Service, {D, T}) ->
+    HashedPayload = hash(Payload),
     Date = date(D),
     TimeStamp = timestamp(Date, T),
-    Scope = scope(Date, Region, Service),
-    HashedPayload = hash(Payload),
     AMZHeaders = [
         {<<"x-amz-content-sha256">>, HashedPayload},
         {<<"x-amz-date">>, TimeStamp}
@@ -33,6 +32,7 @@ headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
     AllHeaders = AMZHeaders ++ Headers,
     {CanonicalRequest, SignedHeaders} =
         canonical_request(Method, CanonicalURI, AllHeaders, HashedPayload),
+    Scope = scope(Date, Region, Service),
     StringToSign = string_to_sign(TimeStamp, Scope, CanonicalRequest),
     Signature =
         signature(SecretAccessKey, Date, Region, Service, StringToSign),
@@ -79,13 +79,14 @@ signature(SecretAccessKey, Date, Region, Service, StringToSign) ->
 
 %--- Parts --------------------------------------------------------------------
 
-method(get) -> <<"GET">>.
+method(get) -> <<"GET">>;
+method(put) -> <<"PUT">>.
 
 canonical_headers(Headers) ->
-    canonical_headers(lists:reverse(lists:sort(Headers)), [], []).
+    canonical_headers(Headers, [], []).
 
 canonical_headers([], CanonicalHeaders, SignedHeaders) ->
-    {CanonicalHeaders, iolist_join(SignedHeaders, $;)};
+    {lists:sort(CanonicalHeaders), iolist_join(lists:sort(SignedHeaders), $;)};
 canonical_headers([Header|Headers], CanonicalHeaders, SignedHeaders) ->
     {C, S} = canonical_header(Header),
     canonical_headers(Headers, [C|CanonicalHeaders], [S|SignedHeaders]).
@@ -100,12 +101,12 @@ scope(Date, Region, Service) ->
 %--- Utility Functions --------------------------------------------------------
 
 timestamp(Date, {Hour, Minute, Second}) ->
-    [Date, "T", pad(Hour), pad(Minute), pad(Second), "Z"].
+    [Date, $T, pad(Hour), pad(Minute), pad(Second), $Z].
 
 date({Year, Month, Day}) ->
     [integer_to_list(Year), pad(Month), pad(Day)].
 
-pad(Number) when Number < 10 -> ["0", integer_to_list(Number)];
+pad(Number) when Number < 10 -> [$0, integer_to_list(Number)];
 pad(Number)                  -> integer_to_list(Number).
 
 lowercase(Binary) when is_binary(Binary) -> lowercase(binary_to_list(Binary));
