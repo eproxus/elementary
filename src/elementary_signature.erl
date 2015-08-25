@@ -14,9 +14,9 @@
 
 headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
         Region, Service) ->
-    Now = calendar:now_to_universal_time(now()),
+    DateTime = calendar:universal_time(),
     headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
-        Region, Service, Now).
+        Region, Service, DateTime).
 
 %--- Internal Functions -------------------------------------------------------
 
