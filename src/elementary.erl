@@ -20,21 +20,48 @@
     secret_access_key
 }).
 
+-type etag() :: {etag, iodata()}.
+-type expires() :: {expires, {Name::iodata(), DateTime::calendar:datetime()}}.
+
+-type option() :: etag().
+-type property() :: etag() | expires().
+
 %--- Application Callbacks ----------------------------------------------------
 
+% @hidden
 start(_StartType, _StartArgs) ->
     ets:new(?MODULE, [named_table, public]),
     {ok, self()}.
 
+% @hidden
 stop(_State) ->
     ets:delete(?MODULE).
 
 %--- API ----------------------------------------------------------------------
 
+% @doc Open a bucket.
+%
+% Valid options are:
+% <ul>
+%     <li>`access_key': Amazon AWS access key</li>
+%     <li>`secret_access_key': Amazon AWS secret access key</li>
+%     <li>
+%         `endpoint': S3 endpoint to use (defaults to `<<"s3.amazonaws.com">>')
+%     </li>
+%     <li>
+%         `connection_timeout': The connection timeout for requests in
+%          milliseconds (defaults to `5000')
+%     </li>
+%     <li>
+%         `max_connections': Max simultaneous connections to S3 (defaults
+%         to `20')
+%     </li>
+% </ul>
+-spec open(Bucket::iodata(), Options::[option()]) -> ok.
 open(Bucket, Options) ->
     AccessKey = get_option(access_key, Options),
     SecretAccessKey = get_option(secret_access_key, Options),
-    Endpoint = get_option(endpoint, Options),
+    Endpoint = get_option(endpoint, Options, <<"s3.amazonaws.com">>),
 
     PoolName = pool_name(Bucket),
     Config = #bucket{
@@ -53,8 +80,21 @@ open(Bucket, Options) ->
         {max_connections, get_option(max_connections, Options, 20)}
     ]).
 
+% @doc Equivalent to `get(Bucket, Key, [])'.
+% @see get/3
 get(Bucket, Key) -> get(Bucket, Key, []).
 
+% @doc Get an object from a bucket.
+%
+% Returns the data for a key in an open bucket (must have been opened with
+% {@link open/2}). If available, the properties will contain the ETag value
+% and the expiration information associated with the key.
+%
+% If an ETag is supplied (with the option `{etag, ETag}'), it is possible that
+% the key has not been modified since the last time. In this case,
+% `not_modified' is then returned instead of the data.
+-spec get(Bucket::iodata(), Key::iodata(), Options::[option()]) ->
+    {Data::iodata() | not_mofified | not_found, Properties::[property()]}.
 get(Bucket, Key, Options) ->
     case request(Bucket, Key, get, <<>>, Options) of
         {200, Headers, BodyRef}  ->
