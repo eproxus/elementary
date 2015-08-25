@@ -4,7 +4,6 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 <a name="index"></a>
 
 ## Function Index ##
@@ -23,13 +22,11 @@
 
 `canonical_request(Method, CanonicalURI, Headers, HashedPayload) -> any()`
 
-
 <a name="headers-8"></a>
 
 ### headers/8 ###
 
 `headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey, Region, Service) -> any()`
-
 
 <a name="headers-9"></a>
 
@@ -37,18 +34,15 @@
 
 `headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey, Region, Service, X9) -> any()`
 
-
 <a name="signature-5"></a>
 
 ### signature/5 ###
 
 `signature(SecretAccessKey, Date, Region, Service, StringToSign) -> any()`
 
-
 <a name="string_to_sign-3"></a>
 
 ### string_to_sign/3 ###
 
 `string_to_sign(TimeStamp, Scope, CanonicalRequest) -> any()`
-
 

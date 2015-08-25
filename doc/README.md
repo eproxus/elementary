@@ -8,12 +8,3 @@
 
 TODO
 
-
-
-## Modules ##
-
-
-<table width="100%" border="0" summary="list of modules">
-<tr><td><a href="elementary.md" class="module">elementary</a></td></tr>
-<tr><td><a href="elementary_signature.md" class="module">elementary_signature</a></td></tr></table>
-

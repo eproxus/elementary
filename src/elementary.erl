@@ -15,7 +15,9 @@
 
 -record(bucket, {
     pool,
-    endpoint,
+    host,
+    url_prefix,
+    region,
     access_key,
     secret_access_key
 }).
@@ -23,7 +25,15 @@
 -type etag() :: {etag, iodata()}.
 -type expires() :: {expires, {Name::iodata(), DateTime::calendar:datetime()}}.
 
--type option() :: etag().
+-type option() ::
+    {access_key, binary()} |
+    {secret_access_key, binary()} |
+    {region, binary()} |
+    {host, binary()} |
+    {connection_timeout, pos_integer()} |
+    {max_connections, pos_integer()}.
+
+-type get_option() :: etag().
 -type property() :: etag() | expires().
 
 %--- Application Callbacks ----------------------------------------------------
@@ -43,10 +53,12 @@ stop(_State) ->
 %
 % Valid options are:
 % <ul>
-%     <li>`access_key': Amazon AWS access key</li>
-%     <li>`secret_access_key': Amazon AWS secret access key</li>
+%     <li>`access_key': Amazon AWS access key (mandatory)</li>
+%     <li>`secret_access_key': Amazon AWS secret access key (mandatory)</li>
+%     <li>`region': Amazon AWS S3 region (mandatory)</li>
 %     <li>
-%         `endpoint': S3 endpoint to use (defaults to `<<"s3.amazonaws.com">>')
+%         `host': Host endpoint to connect to (defaults to
+%         `s3-REGION.amazonaws.com')
 %     </li>
 %     <li>
 %         `connection_timeout': The connection timeout for requests in
@@ -59,14 +71,17 @@ stop(_State) ->
 % </ul>
 -spec open(Bucket::iodata(), Options::[option()]) -> ok.
 open(Bucket, Options) ->
-    AccessKey = get_option(access_key, Options),
-    SecretAccessKey = get_option(secret_access_key, Options),
-    Endpoint = get_option(endpoint, Options, <<"s3.amazonaws.com">>),
+    AccessKey = option(access_key, Options),
+    SecretAccessKey = option(secret_access_key, Options),
+    Region = option(region, Options),
+
+    Host = option(host, Options, [<<"s3-">>, Region, <<".amazonaws.com">>]),
 
     PoolName = pool_name(Bucket),
     Config = #bucket{
         pool = PoolName,
-        endpoint = Endpoint,
+        host = Host,
+        region = Region,
         access_key = AccessKey,
         secret_access_key = SecretAccessKey
     },
@@ -76,8 +91,8 @@ open(Bucket, Options) ->
     end,
 
     ok = hackney_pool:start_pool(PoolName, [
-        {timeout, get_option(connection_timeout, Options, 5000)},
-        {max_connections, get_option(max_connections, Options, 20)}
+        {timeout, option(connection_timeout, Options, 5000)},
+        {max_connections, option(max_connections, Options, 20)}
     ]).
 
 % @doc Equivalent to `get(Bucket, Key, [])'.
@@ -93,7 +108,7 @@ get(Bucket, Key) -> get(Bucket, Key, []).
 % If an ETag is supplied (with the option `{etag, ETag}'), it is possible that
 % the key has not been modified since the last time. In this case,
 % `not_modified' is then returned instead of the data.
--spec get(Bucket::iodata(), Key::iodata(), Options::[option()]) ->
+-spec get(Bucket::iodata(), Key::iodata(), Options::[get_option()]) ->
     {Data::iodata() | not_mofified | not_found, Properties::[property()]}.
 get(Bucket, Key, Options) ->
     case request(Bucket, Key, get, <<>>, Options) of
@@ -109,8 +124,8 @@ get(Bucket, Key, Options) ->
             )};
         {404, _Headers, _BodyRef} ->
             {not_found, []};
-        Response ->
-            error({unknown_response, Response})
+        {Code, Headers, BodyRef} ->
+            error({unknown_response, {Code, Headers, get_body(BodyRef)}})
     end.
 
 put(Bucket, Key, Data) ->
@@ -135,8 +150,8 @@ close(Bucket) ->
 request(Bucket, Key, Method, Payload, Options) ->
     Config = get_bucket(Bucket),
 
-    Host = [Bucket, <<".">>, Config#bucket.endpoint],
-    Path = [<<"/">>, Key],
+    Host = Config#bucket.host,
+    Path = [<<"/">>, Bucket, <<"/">>, Key],
     URL = [Host, Path],
     HackneyOptions = [{pool, Config#bucket.pool}],
     Headers = [
@@ -150,20 +165,20 @@ request(Bucket, Key, Method, Payload, Options) ->
         Payload,
         Config#bucket.access_key,
         Config#bucket.secret_access_key,
-        <<"eu-west-1">>,
+        Config#bucket.region,
         <<"s3">>
     ),
     {ok, StatusCode, RespHeaders, ClientRef} =
         hackney:request(Method, URL, Headers ++ Auth, Payload, HackneyOptions),
     {StatusCode, RespHeaders, ClientRef}.
 
-get_option(Key, Options) ->
+option(Key, Options) ->
     case proplists:lookup(Key, Options) of
         none         -> error({missing_option, Key});
         {Key, Value} -> Value
     end.
 
-get_option(Key, Options, Default) ->
+option(Key, Options, Default) ->
     proplists:get_value(Key, Options, Default).
 
 get_bucket(Bucket) ->

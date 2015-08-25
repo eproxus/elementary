@@ -17,7 +17,6 @@ __Behaviours:__ [`application`](application.md).
 ### <a name="type-etag">etag()</a> ###
 
 
-
 <pre><code>
 etag() = {etag, iodata()}
 </code></pre>
@@ -25,9 +24,7 @@ etag() = {etag, iodata()}
 
 
 
-
 ### <a name="type-expires">expires()</a> ###
-
 
 
 <pre><code>
@@ -37,15 +34,22 @@ expires() = {expires, {Name::iodata(), DateTime::<a href="calendar.md#type-datet
 
 
 
+### <a name="type-get_option">get_option()</a> ###
+
+
+<pre><code>
+get_option() = <a href="#type-etag">etag()</a>
+</code></pre>
+
+
+
 
 ### <a name="type-option">option()</a> ###
 
 
-
 <pre><code>
-option() = <a href="#type-etag">etag()</a>
+option() = {access_key, binary()} | {secret_access_key, binary()} | {region, binary()} | {host, binary()} | {connection_timeout, pos_integer()} | {max_connections, pos_integer()}
 </code></pre>
-
 
 
 
@@ -53,11 +57,9 @@ option() = <a href="#type-etag">etag()</a>
 ### <a name="type-property">property()</a> ###
 
 
-
 <pre><code>
 property() = <a href="#type-etag">etag()</a> | <a href="#type-expires">expires()</a>
 </code></pre>
-
 
 <a name="index"></a>
 
@@ -77,7 +79,6 @@ property() = <a href="#type-etag">etag()</a> | <a href="#type-expires">expires()
 
 `close(Bucket) -> any()`
 
-
 <a name="get-2"></a>
 
 ### get/2 ###
@@ -87,54 +88,53 @@ property() = <a href="#type-etag">etag()</a> | <a href="#type-expires">expires()
 Equivalent to `get(Bucket, Key, [])`.
 
 __See also:__ [get/3](#get-3).
+
 <a name="get-3"></a>
 
 ### get/3 ###
 
-
 <pre><code>
-get(Bucket::iodata(), Key::iodata(), Options::[<a href="#type-option">option()</a>]) -&gt; {Data::iodata() | not_mofified | not_found, Properties::[<a href="#type-property">property()</a>]}
+get(Bucket::iodata(), Key::iodata(), Options::[<a href="#type-get_option">get_option()</a>]) -&gt; {Data::iodata() | not_mofified | not_found, Properties::[<a href="#type-property">property()</a>]}
 </code></pre>
-
-<br></br>
-
-
+<br />
 
 Get an object from a bucket.
-
-
 
 Returns the data for a key in an open bucket (must have been opened with
 [`open/2`](#open-2)). If available, the properties will contain the ETag value 
 and the expiration information associated with the key.
 
-
 If an ETag is supplied (with the option `{etag, ETag}`), it is possible that
 the key has not been modified since the last time. In this case,
 `not_modified` is then returned instead of the data.
+
 <a name="open-2"></a>
 
 ### open/2 ###
 
-
 <pre><code>
 open(Bucket::iodata(), Options::[<a href="#type-option">option()</a>]) -&gt; ok
 </code></pre>
-
-<br></br>
-
-
+<br />
 
 Open a bucket.
 
-
 Valid options are:
 
-* `access_key`: Amazon AWS access key
+* `access_key`: Amazon AWS access key (mandatory)
 
-* `secret_access_key`: Amazon AWS secret access key
+* `secret_access_key`: Amazon AWS secret access key (mandatory)
 
-* `endpoint`: S3 endpoint to use (defaults to `<<"s3.amazonaws.com">>`)
+* `region`: Amazon AWS S3 region (mandatory)
+
+* `host`: Host endpoint to connect to (defaults to
+`s3-REGION.amazonaws.com`)
+
+* `connection_timeout`: The connection timeout for requests in
+milliseconds (defaults to `5000`)
+
+* `max_connections`: Max simultaneous connections to S3 (defaults
+to `20`)
 
 
 <a name="put-3"></a>
@@ -142,5 +142,4 @@ Valid options are:
 ### put/3 ###
 
 `put(Bucket, Key, Data) -> any()`
-
 
