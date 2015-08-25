@@ -1,6 +1,4 @@
-
-
-# Elementary - A modern S3 client for Erlang #
+# Elementary - A modern S3 client for Erlang
 
 [![Release](http://img.shields.io/github/release/eproxus/elementary.svg)](https://github.com/eproxus/elementary/releases/latest)
 [![Build Status](http://img.shields.io/travis/eproxus/elementary.svg)](http://travis-ci.org/eproxus/elementary)
@@ -8,10 +6,7 @@
 
 TODO
 
-
-
-## Modules ##
-
+## Modules
 
 <table width="100%" border="0" summary="list of modules">
 <tr><td><a href="https://github.com/eproxus/elementary/blob/master/doc/elementary.md" class="module">elementary</a></td></tr>
