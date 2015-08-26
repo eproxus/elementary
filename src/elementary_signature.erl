@@ -1,27 +1,27 @@
 -module(elementary_signature).
 
 % API
--export([headers/8]).
+-export([headers/9]).
 
 -ifdef(TEST).
--export([headers/9]).
--export([canonical_request/4]).
+-export([headers/10]).
+-export([canonical_request/5]).
 -export([string_to_sign/3]).
 -export([signature/5]).
 -endif.
 
 %--- API ----------------------------------------------------------------------
 
-headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
-        Region, Service) ->
+headers(Method, URI, QueryString, Headers, Payload, AccessKey,
+        SecretAccessKey, Region, Service) ->
     DateTime = calendar:universal_time(),
-    headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
-        Region, Service, DateTime).
+    headers(Method, URI, QueryString, Headers, Payload, AccessKey,
+        SecretAccessKey, Region, Service, DateTime).
 
 %--- Internal Functions -------------------------------------------------------
 
-headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
-        Region, Service, {D, T}) ->
+headers(Method, URI, QueryString, Headers, Payload, AccessKey,
+        SecretAccessKey, Region, Service, {D, T}) ->
     HashedPayload = hash(Payload),
     Date = date(D),
     TimeStamp = timestamp(Date, T),
@@ -30,13 +30,14 @@ headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
         {<<"x-amz-date">>, TimeStamp}
     ],
     AllHeaders = AMZHeaders ++ Headers,
-    {CanonicalRequest, SignedHeaders} =
-        canonical_request(Method, CanonicalURI, AllHeaders, HashedPayload),
+    {CanonicalRequest, SignedHeaders, QueryString} =
+        canonical_request(Method, URI, QueryString, AllHeaders,
+            HashedPayload),
     Scope = scope(Date, Region, Service),
     StringToSign = string_to_sign(TimeStamp, Scope, CanonicalRequest),
     Signature =
         signature(SecretAccessKey, Date, Region, Service, StringToSign),
-    [
+    SignatureHeaders = [
         {
             <<"Authorization">>, [
                 <<"AWS4-HMAC-SHA256 Credential=">>,
@@ -46,20 +47,23 @@ headers(Method, CanonicalURI, Headers, Payload, AccessKey, SecretAccessKey,
             ]
         }
         | AMZHeaders
-    ].
+    ],
+    {SignatureHeaders, QueryString}.
 
-canonical_request(Method, CanonicalURI, Headers, HashedPayload) ->
+canonical_request(Method, URI, QueryString, Headers, HashedPayload) ->
     {CanonicalHeaders, SignedHeaders} = canonical_headers(Headers),
+    CanonicalQueryString = hackney_url:qs(lists:sort(QueryString)),
     {
         [
             method(Method), $\n,
-            CanonicalURI, $\n,
-            $\n,
+            canonical_uri(URI), $\n,
+            CanonicalQueryString, $\n,
             CanonicalHeaders, $\n,
             SignedHeaders, $\n,
             HashedPayload
         ],
-        SignedHeaders
+        SignedHeaders,
+        QueryString
     }.
 
 string_to_sign(TimeStamp, Scope, CanonicalRequest) ->
@@ -82,11 +86,13 @@ signature(SecretAccessKey, Date, Region, Service, StringToSign) ->
 method(get) -> <<"GET">>;
 method(put) -> <<"PUT">>.
 
+canonical_uri(URI) -> [$/, URI].
+
 canonical_headers(Headers) ->
     canonical_headers(Headers, [], []).
 
 canonical_headers([], CanonicalHeaders, SignedHeaders) ->
-    {lists:sort(CanonicalHeaders), iolist_join(lists:sort(SignedHeaders), $;)};
+    {lists:sort(CanonicalHeaders), join(lists:sort(SignedHeaders), $;)};
 canonical_headers([Header|Headers], CanonicalHeaders, SignedHeaders) ->
     {C, S} = canonical_header(Header),
     canonical_headers(Headers, [C|CanonicalHeaders], [S|SignedHeaders]).
@@ -106,7 +112,7 @@ timestamp(Date, {Hour, Minute, Second}) ->
 date({Year, Month, Day}) ->
     [integer_to_list(Year), pad(Month), pad(Day)].
 
-pad(Number) when Number < 10 -> [$0, integer_to_list(Number)];
+pad(Number) when Number < 10 -> [$0|integer_to_list(Number)];
 pad(Number)                  -> integer_to_list(Number).
 
 lowercase(Binary) when is_binary(Binary) -> lowercase(binary_to_list(Binary));
@@ -120,5 +126,5 @@ hash(<<>>) ->
 hash(Payload) ->
     hmac:hexlify(erlsha2:sha256(Payload), [lower]).
 
-iolist_join([], _Separator)          -> [];
-iolist_join([First|List], Separator) -> [First, [[Separator, I] || I <- List]].
+join([], _Separator)          -> [];
+join([First|List], Separator) -> [First, [[Separator, I] || I <- List]].

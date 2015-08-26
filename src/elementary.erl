@@ -93,7 +93,18 @@ open(Bucket, Options) ->
     ok = hackney_pool:start_pool(PoolName, [
         {timeout, option(connection_timeout, Options, 5000)},
         {max_connections, option(max_connections, Options, 20)}
-    ]).
+    ]),
+
+    case request(get, Bucket, [], #{query => [{"max-keys", 0}]}) of
+        {200, _Headers, _BodyRef} ->
+            ok;
+        {301, _Headers, _BodyRef} ->
+            error(Bucket, {wrong_region, Bucket});
+        {404, _Headers, _BodyRef} ->
+            error(Bucket, {no_such_bucket, Bucket});
+        Other ->
+            error(Bucket, {unknown_response, Other})
+    end.
 
 % @doc Equivalent to `get(Bucket, Key, [])'.
 % @see get/3
@@ -111,7 +122,7 @@ get(Bucket, Key) -> get(Bucket, Key, []).
 -spec get(Bucket::iodata(), Key::iodata(), Options::[get_option()]) ->
     {Data::iodata() | not_mofified | not_found, Properties::[property()]}.
 get(Bucket, Key, Options) ->
-    case request(Bucket, Key, get, <<>>, Options) of
+    case request(get, Bucket, [Key], #{headers => to_headers(Options)}) of
         {200, Headers, BodyRef}  ->
             {get_body(BodyRef), headers(
                 [{etag, <<"ETag">>}, {expires, <<"x-amz-expiration">>}],
@@ -129,7 +140,7 @@ get(Bucket, Key, Options) ->
     end.
 
 put(Bucket, Key, Data) ->
-    case request(Bucket, Key, put, Data, []) of
+    case request(put, Bucket, [Key], #{body => Data}) of
         {200, Headers, _BodyRef} ->
             headers(
                 [{etag, <<"ETag">>}, {expires, <<"x-amz-expiration">>}],
@@ -147,29 +158,34 @@ close(Bucket) ->
 
 %--- Internal Functions -------------------------------------------------------
 
-request(Bucket, Key, Method, Payload, Options) ->
-    Config = get_bucket(Bucket),
+request(Method, Bucket, Path, Options) ->
+    Headers = maps:get(headers, Options, []),
+    Body = maps:get(body, Options, <<>>),
+    Query = maps:get(query, Options, []),
 
+    Config = get_bucket(Bucket),
     Host = Config#bucket.host,
-    Path = [<<"/">>, Bucket, <<"/">>, Key],
-    URL = [Host, Path],
-    HackneyOptions = [{pool, Config#bucket.pool}],
-    Headers = [
+
+
+    AllHeaders = [
         {<<"Host">>, Host},
-        {<<"Content-Length">>, integer_to_list(byte_size(Payload))}
-    ] ++ to_headers(Options),
-    Auth =  elementary_signature:headers(
+        {<<"Content-Length">>, integer_to_list(byte_size(Body))}
+    ] ++ Headers,
+    {Auth, QueryString} = elementary_signature:headers(
         Method,
-        Path,
-        Headers,
-        Payload,
+        hackney_url:make_url(Bucket, Path, []),
+        Query,
+        AllHeaders,
+        Body,
         Config#bucket.access_key,
         Config#bucket.secret_access_key,
         Config#bucket.region,
         <<"s3">>
     ),
+    URI = hackney_url:make_url(Host, [Bucket, Path], QueryString),
+    HackneyOptions = [{pool, Config#bucket.pool}],
     {ok, StatusCode, RespHeaders, ClientRef} =
-        hackney:request(Method, URL, Headers ++ Auth, Payload, HackneyOptions),
+        hackney:request(Method, URI, AllHeaders ++ Auth, Body, HackneyOptions),
     {StatusCode, RespHeaders, ClientRef}.
 
 option(Key, Options) ->
@@ -250,3 +266,7 @@ binary_to_month(<<"Sep">>) -> 9;
 binary_to_month(<<"Oct">>) -> 10;
 binary_to_month(<<"Nov">>) -> 11;
 binary_to_month(<<"Dec">>) -> 12.
+
+error(Bucket, Error) ->
+    close(Bucket),
+    error(Error).
