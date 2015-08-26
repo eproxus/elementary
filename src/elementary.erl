@@ -99,11 +99,11 @@ open(Bucket, Options) ->
         {200, _Headers, _BodyRef} ->
             ok;
         {301, _Headers, _BodyRef} ->
-            error(Bucket, {wrong_region, Bucket});
+            close_error(Bucket, {wrong_region, Bucket});
         {404, _Headers, _BodyRef} ->
-            error(Bucket, {no_such_bucket, Bucket});
+            close_error(Bucket, {no_such_bucket, Bucket});
         Other ->
-            error(Bucket, {unknown_response, Other})
+            close_error(Bucket, {unknown_response, Other})
     end.
 
 % @doc Equivalent to `get(Bucket, Key, [])'.
@@ -267,6 +267,6 @@ binary_to_month(<<"Oct">>) -> 10;
 binary_to_month(<<"Nov">>) -> 11;
 binary_to_month(<<"Dec">>) -> 12.
 
-error(Bucket, Error) ->
+close_error(Bucket, Error) ->
     close(Bucket),
     error(Error).
