@@ -96,13 +96,13 @@ open(Bucket, Options) ->
     ]),
 
     case request(get, Bucket, [], #{query => [{"max-keys", 0}]}) of
-        {200, _Headers, _BodyRef} ->
+        {200, _Headers, _Body} ->
             ok;
-        {301, _Headers, _BodyRef} ->
+        {301, _Headers, _Body} ->
             close_error(Bucket, {wrong_region, Bucket});
-        {404, _Headers, _BodyRef} ->
+        {404, _Headers, _Body} ->
             close_error(Bucket, {no_such_bucket, Bucket});
-        Other ->
+        {Other, _Headers, _Body} ->
             close_error(Bucket, {unknown_response, Other})
     end.
 
@@ -123,25 +123,25 @@ get(Bucket, Key) -> get(Bucket, Key, []).
     {Data::iodata() | not_mofified | not_found, Properties::[property()]}.
 get(Bucket, Key, Options) ->
     case request(get, Bucket, [Key], #{headers => to_headers(Options)}) of
-        {200, Headers, BodyRef}  ->
-            {get_body(BodyRef), headers(
+        {200, Headers, Body}  ->
+            {Body, headers(
                 [{etag, <<"ETag">>}, {expires, <<"x-amz-expiration">>}],
                 Headers
             )};
-        {304, Headers, _BodyRef} ->
+        {304, Headers, _Body} ->
             {not_modified, headers(
                 [{etag, <<"ETag">>}, {expires, <<"x-amz-expiration">>}],
                 Headers
             )};
-        {404, _Headers, _BodyRef} ->
+        {404, _Headers, _Body} ->
             {not_found, []};
-        {Code, Headers, BodyRef} ->
-            error({unknown_response, {Code, Headers, get_body(BodyRef)}})
+        {Code, Headers, Body} ->
+            error({unknown_response, {Code, Headers, Body}})
     end.
 
 put(Bucket, Key, Data) ->
     case request(put, Bucket, [Key], #{body => Data}) of
-        {200, Headers, _BodyRef} ->
+        {200, Headers, _Body} ->
             headers(
                 [{etag, <<"ETag">>}, {expires, <<"x-amz-expiration">>}],
                 Headers
@@ -183,10 +183,10 @@ request(Method, Bucket, Path, Options) ->
         <<"s3">>
     ),
     URI = hackney_url:make_url(Host, [Bucket, Path], QueryString),
-    HackneyOptions = [{pool, Config#bucket.pool}],
-    {ok, StatusCode, RespHeaders, ClientRef} =
+    HackneyOptions = [{pool, Config#bucket.pool}, with_body],
+    {ok, StatusCode, RespHeaders, RespBody} =
         hackney:request(Method, URI, AllHeaders ++ Auth, Body, HackneyOptions),
-    {StatusCode, RespHeaders, ClientRef}.
+    {StatusCode, RespHeaders, RespBody}.
 
 option(Key, Options) ->
     case proplists:lookup(Key, Options) of
@@ -206,10 +206,6 @@ get_bucket(Bucket) ->
 
 pool_name(Bucket) ->
     binary_to_atom(iolist_to_binary([<<"elementary_">>, Bucket]), utf8).
-
-get_body(BodyRef) ->
-    {ok, Body} = hackney:body(BodyRef),
-    Body.
 
 headers([], _Headers) ->
     [];
