@@ -14,12 +14,13 @@
 -export([close/1]).
 
 -record(bucket, {
-    pool,
-    host,
-    url_prefix,
-    region,
     access_key,
-    secret_access_key
+    secret_access_key,
+    endpoint,
+    host,
+    path,
+    region,
+    pool
 }).
 
 -type etag() :: {etag, iodata()}.
@@ -57,8 +58,12 @@ stop(_State) ->
 %     <li>`secret_access_key': Amazon AWS secret access key (mandatory)</li>
 %     <li>`region': Amazon AWS S3 region (mandatory)</li>
 %     <li>
-%         `host': Host endpoint to connect to (defaults to
+%         `host': Host to send requests to (defaults to
 %         `s3-REGION.amazonaws.com')
+%     </li>
+%     <li>
+%         `endpoint': Endpoint to use in `Host' header (defaults to
+%         `s3.amazonaws.com')
 %     </li>
 %     <li>
 %         `connection_timeout': The connection timeout for requests in
@@ -73,17 +78,18 @@ stop(_State) ->
 open(Bucket, Options) ->
     AccessKey = option(access_key, Options),
     SecretAccessKey = option(secret_access_key, Options),
-    Region = option(region, Options),
 
-    Host = option(host, Options, [<<"s3-">>, Region, <<".amazonaws.com">>]),
+    {Endpoint, Path} = address(Bucket, Options),
 
     PoolName = pool_name(Bucket),
     Config = #bucket{
-        pool = PoolName,
-        host = Host,
-        region = Region,
         access_key = AccessKey,
-        secret_access_key = SecretAccessKey
+        secret_access_key = SecretAccessKey,
+        endpoint = Endpoint,
+        host = option(host, Options, Endpoint),
+        path = Path,
+        region = option(region, Options, <<"us-standard">>),
+        pool = PoolName
     },
     case ets:insert_new(?MODULE, {Bucket, Config}) of
         true  -> ok;
@@ -105,6 +111,29 @@ open(Bucket, Options) ->
         {Other, _Headers, _Body} ->
             close_error(Bucket, {unknown_response, Other})
     end.
+
+address(Bucket, Options) ->
+    address(
+        Bucket,
+        proplists:get_value(endpoint, Options),
+        proplists:get_value(region, Options),
+        proplists:get_value(style, Options, virtual)
+    ).
+
+address(Bucket, undefined, undefined, virtual) ->
+    {[Bucket, <<".s3.amazonaws.com">>], []};
+address(Bucket, undefined, _Region, virtual) ->
+    {[Bucket, <<".s3.amazonaws.com">>], []};
+    % {[Bucket, <<".s3-">>, Region, <<".amazonaws.com">>], [<<>>]};
+address(Bucket, undefined, undefined, path) ->
+    {<<"s3.amazonaws.com">>, [Bucket]};
+address(Bucket, undefined, _Region, path) ->
+    {<<"s3.amazonaws.com">>, [Bucket]};
+    % {[<<"s3-">>, Region, <<".amazonaws.com">>], Bucket};
+address(Bucket, Endpoint, _, virtual) ->
+    {[Bucket, $., Endpoint], []};
+address(Bucket, Endpoint, _, path) ->
+    {Endpoint, [Bucket]}.
 
 % @doc Equivalent to `get(Bucket, Key, [])'.
 % @see get/3
@@ -164,16 +193,17 @@ request(Method, Bucket, Path, Options) ->
     Query = maps:get(query, Options, []),
 
     Config = get_bucket(Bucket),
-    Host = Config#bucket.host,
+    Endpoint = Config#bucket.endpoint,
 
+    FullPath = path(Config#bucket.path ++ Path),
 
     AllHeaders = [
-        {<<"Host">>, Host},
-        {<<"Content-Length">>, integer_to_list(byte_size(Body))}
-    ] ++ Headers,
+        {<<"Host">>, Config#bucket.host},
+        {<<"Content-Length">>, integer_to_binary(byte_size(Body))}
+    |Headers],
     {Auth, QueryString} = elementary_signature:headers(
         Method,
-        hackney_url:make_url(Bucket, Path, []),
+        FullPath,
         Query,
         AllHeaders,
         Body,
@@ -182,11 +212,14 @@ request(Method, Bucket, Path, Options) ->
         Config#bucket.region,
         <<"s3">>
     ),
-    URI = hackney_url:make_url(Host, [Bucket, Path], QueryString),
+    URI = hackney_url:make_url(Endpoint, FullPath, QueryString),
     HackneyOptions = [{pool, Config#bucket.pool}, with_body],
     {ok, StatusCode, RespHeaders, RespBody} =
         hackney:request(Method, URI, AllHeaders ++ Auth, Body, HackneyOptions),
     {StatusCode, RespHeaders, RespBody}.
+
+path([])   -> [<<>>];
+path(Path) -> Path.
 
 option(Key, Options) ->
     case proplists:lookup(Key, Options) of
