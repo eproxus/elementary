@@ -194,7 +194,7 @@ request(Method, Bucket, Path, Options) ->
     Config = get_bucket(Bucket),
     Endpoint = Config#bucket.endpoint,
 
-    FullPath = path(Config#bucket.path ++ Path),
+    FullPath = Enum.join(Config#bucket.path ++ Path, "/"),
 
     AllHeaders = [
         {<<"Host">>, Config#bucket.host},
@@ -216,9 +216,6 @@ request(Method, Bucket, Path, Options) ->
     {ok, StatusCode, RespHeaders, RespBody} =
         hackney:request(Method, URI, AllHeaders ++ Auth, Body, HackneyOptions),
     {StatusCode, RespHeaders, RespBody}.
-
-path([])   -> [<<>>];
-path(Path) -> Path.
 
 option(Key, Options) ->
     case proplists:lookup(Key, Options) of
