@@ -128,7 +128,7 @@ address(Bucket, undefined, _Region, virtual) ->
 address(Bucket, undefined, undefined, path) ->
     {<<"s3.amazonaws.com">>, [Bucket]};
 address(Bucket, undefined, Region, path) ->
-    {[<<"s3-">>, Region, <<".amazonaws.com">>], Bucket};
+    {[<<"s3-">>, Region, <<".amazonaws.com">>], [Bucket]};
 address(Bucket, Endpoint, _, virtual) ->
     {[Bucket, $., Endpoint], []};
 address(Bucket, Endpoint, _, path) ->
