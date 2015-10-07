@@ -108,8 +108,8 @@ open(Bucket, Options) ->
             close_error(Bucket, {wrong_region, Bucket});
         {404, _Headers, _Body} ->
             close_error(Bucket, {no_such_bucket, Bucket});
-        {Other, _Headers, _Body} ->
-            close_error(Bucket, {unknown_response, Other})
+        {Other, Headers, Body} ->
+            close_error(Bucket, {unknown_response, Other, Headers, Body})
     end.
 
 address(Bucket, Options) ->
